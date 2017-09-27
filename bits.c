@@ -430,50 +430,49 @@ unsigned float_neg(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_half(unsigned uf) {
-		
-	int sf = uf;
-//	int exp_s = sf>>23<<23;
-	/* exp_s is collecting exp and s part of uf*/
-//	printf("exp_s = %x\n", exp_s);
-//	int temp = 1<<31>>8;
-	/* temo has exp and s to 1*/
-//	printf("temp = %x\n", temp);
+	int sign_f = uf;
+	unsigned sf = uf;
+	int result;
+	unsigned exp = sf<<1>>24;
+//	int zero_first_9 = ~(1<<31>>8);	
+//	int sign = sf>>31;
+//	int M = sf<<9>>9 ;
+	int default_ = 1<<31;
+	int i = default_;
+	int temp_1 = ~(i>>8 & ~i) ;
+	int temp_2 = sf & temp_1;
 
-	int t1 = uf<<1;
-	int t2 = t1>>24;
-	int check_1 = ~t2;
+	/* Denormalized numbers' M shift to right one bit*/
+	/* Normalized numbers smaller than FFFFFE(included) shift to be denormalized
+	 * following the rule of shifting to even
+	 * ex 800007->400004
+	 * 800008->400004
+	 * 800009->400004 */
 
-	if(uf == 0)
-		return 0;
-	if(uf == (1<<31))
-		return uf;
-	/* check_1 is zero if exp is 11111111 */
-	if( !check_1 ){
-		int check_2 = !(uf<<9);
-		/* check_2 is zero, namely M is Non-zero, NaN*/
-		printf("Got a NaN\n");
-		if (!check_2)
-			return uf;
+	/* Larger Normalized numbers just decrease exp by 1 */
+	/* Denormalized shift rightwards one bit */
+	/* Normalized no larger than FFFFFF needs shift exp and round M */
+	/* If %2 is 1, it needs rounding */
+	if( exp <= 1u ) {
+		result = sf>>1;
+		if (sf%2 == 1){
+			if ((result)%2 == 1){	
+			result = result + 1;
+			}
+		}
+			/* If /2 is odd(LSB is 1), it needs rounding up */			/* Now we need to clear the 31 bit up because of shifting */
+		return (~(1<<30) & result) | (sf & 1<<31);
 	}
-	/* else uf is not NaN*/
 
-	int i = ~(1<<31>>9);
-	int M = sf<<9>>9 & i ;
-	int k = (1)<<31>>22;
-	int exp = sf>>23 & ~k;
-	exp = exp - 126;
-	int sign = sf & (1<<31);
-	/* exp_s is collecting exp and s part of uf*/
-	//int temp = ~(1<<30);
-	/* temo has exp and s to 1*/
-	
-	sf = exp<<23;
-	sf = sf | M | sign;
+	/* then it's normalized*/
+	if ( ~(sign_f<<1>>24) == 0)
+	/* if it is infinite*/
+	/* or if it is NaN*/
+		return uf;
 
-	/* exp_s 's M is 0*/	
-//	sf = (sf & ~temp) >>1;
-//	sf = sf | exp_s;	
-  return sf;
+	/* For a normalized larger number, we shift exp by 1*/
+	exp = exp - 1;
+	return (exp<<23) | temp_2 ;
 }
 /* 
  * float_f2i - Return bit-level equivalent of expression (int) f
@@ -488,21 +487,33 @@ unsigned float_half(unsigned uf) {
  *   Rating: 4
  */
 int float_f2i(unsigned uf) {
-	int sf = uf;
-	int zero_first_9 = ~(1<<31>>9);
-	int M = sf<<9>>9 & zero_first_9;
+	int sign_f = uf;
+	unsigned sf = uf;
+	int result;
+	unsigned exp = sf<<1>>24;
+	int default_ = 1<<31;
 
-
-	int t1 = uf<<1;
-	int t2 = t1>>24;
-	int check_1 = ~t2;
-	int temp = 1<<31;
-	/* check_1 is zero if exp is 11111111 */
-	if( !check_1 ){
-			return temp;
-	}
-	if(M == 0)
+	if ( ~(sign_f<<1>>24) == 0)
+	/* if it is infinite*/
+	/* or if it is NaN*/
+		return default_;
+	if ( uf<<1 == 0)
 		return 0;
+
+
+	if( exp <= 0x7e ) {
+
+		return 0;
+	}
+	if( exp >= 158){
+		return default_;
+	}
 	
-  return uf;
+	
+	exp = exp - 127;
+	result = 1<<exp;
+	if ( uf >= default_)
+		return -result;
+	else return result;
+
 }
